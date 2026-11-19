@@ -570,7 +570,10 @@ def pagina_auto(a, slug, autos, slugs, og_img, cfg):
         og_titulo = f"{nombre_corto(a)} {a['anio'] or ''} · {km_texto(a)}" + (f" · {precio}" if precio else "")
         og_titulo = re.sub(r"\s+", " ", og_titulo)
         desc_base = "Usado peritado y escaneado. " + " · ".join(x for x in [a["transmision"], a["combustible"], a["color"]] if x) + "."
-    descripcion = recortar(f"{desc_base} {capitalizar_inicio(a['descripcion'])} ADG Autos, San Nicolás de los Arroyos.", 200)
+    texto_auto = capitalizar_inicio(a["descripcion"]).rstrip()
+    if texto_auto and texto_auto[-1] not in ".!?…":
+        texto_auto += "."
+    descripcion = recortar(f"{desc_base} {texto_auto} ADG Autos, San Nicolás de los Arroyos.", 200)
 
     # Galería
     fotos = a["fotos"]
