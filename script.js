@@ -35,7 +35,7 @@ const CONFIG = {
 
     // ID del Píxel de Meta (Administrador de eventos > Orígenes de datos > tu píxel).
     // Vacío = el píxel no se carga. Al completarlo, también lo toman las páginas de cada auto.
-    metaPixelId: '',
+    metaPixelId: '2603231776861941',
 
     // API pública gratuita de precios de autos en Argentina (CCA + ACARA)
     // Se usa para la tasación del cliente (el precio va solo al WhatsApp de ADG)
