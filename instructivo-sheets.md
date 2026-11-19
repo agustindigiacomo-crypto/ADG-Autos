@@ -218,3 +218,18 @@ Poné `SI` en la columna `destacado`. Los destacados salen en el carrusel arriba
 ## 📞 ¿Algo no funciona?
 
 Avisame y te ayudo. Cualquier cambio en la estructura de las columnas tengo que replicarlo en el código, así que si querés agregar o sacar columnas, avisame primero.
+
+---
+
+## 🔗 Página propia de cada auto (automático)
+
+Cada auto disponible tiene su propia página, por ejemplo `adgautos.com.ar/autos/chevrolet-captiva-2015-6/`.
+Esa es la página que conviene compartir por WhatsApp, Instagram o Marketplace: muestra foto, precio y km en la vista previa, y Google la puede encontrar.
+
+- **No hay que hacer nada**: GitHub la genera solo cada 30 minutos leyendo esta misma planilla.
+- **Para que aparezca al toque**: en GitHub → pestaña **Actions** → **Páginas de autos** → **Run workflow**.
+- El botón **Compartir** de la web ya usa ese link. Si el auto es recién cargado y todavía no tiene página, comparte el link viejo (`?auto=ID`), que sigue funcionando.
+- **Cuando un auto se vende** (`disponible = NO`): su página no se borra; pasa a decir "Esta unidad ya se vendió" con autos parecidos y un botón de WhatsApp para pedir que le avisen. Así ningún link viejo queda roto.
+- **No cambies el `id`** de un auto ya publicado: es lo que identifica su página.
+- La foto de la vista previa es `foto_1`. Si la cambiás, la vista previa se actualiza sola (WhatsApp puede tardar en refrescarla porque la guarda un tiempo).
+- Todo el stock también queda listado en `adgautos.com.ar/autos/`.

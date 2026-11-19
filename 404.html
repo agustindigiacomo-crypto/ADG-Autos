@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Página no encontrada | ADG Autos</title>
+<meta name="robots" content="noindex">
+<script>
+  // Links a autos que todavía no tienen página (recién cargados) o con el nombre mal escrito:
+  // /autos/<lo-que-sea>-<id>/  →  abre el auto en la web principal.
+  (function () {
+    var m = location.pathname.match(/^\/autos\/(?:[^\/]*-)?([A-Za-z0-9]+)\/?$/);
+    if (m) location.replace('/?auto=' + encodeURIComponent(m[1]));
+  })();
+</script>
+<link rel="icon" type="image/png" href="/img/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .nf { min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 40px 24px;
+        background: var(--color-black); color: var(--color-white); }
+  .nf img { width: 180px; margin: 0 auto 36px; }
+  .nf h1 { font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; text-transform: uppercase; margin-bottom: 10px; }
+  .nf p { color: rgba(255,255,255,0.65); margin-bottom: 28px; }
+  .nf .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<main class="nf">
+  <div>
+    <img src="/img/logo-adg.png" alt="ADG Autos">
+    <h1>No encontramos esta página</h1>
+    <p>Puede que el auto ya se haya vendido o que el link esté incompleto.</p>
+    <div class="btns">
+      <a class="btn btn-primary" href="/autos/">Ver stock disponible</a>
+      <a class="btn btn-secondary" href="https://wa.me/5493364529314?text=Hola!%20Me%20interesa%20consultar%20sobre%20un%20veh%C3%ADculo">Escribinos por WhatsApp</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

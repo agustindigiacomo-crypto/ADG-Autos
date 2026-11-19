@@ -33,6 +33,10 @@ const CONFIG = {
     // Si la planilla falla, usar datos demo
     usarDemoSiFalla: true,
 
+    // ID del Píxel de Meta (Administrador de eventos > Orígenes de datos > tu píxel).
+    // Vacío = el píxel no se carga. Al completarlo, también lo toman las páginas de cada auto.
+    metaPixelId: '',
+
     // API pública gratuita de precios de autos en Argentina (CCA + ACARA)
     // Se usa para la tasación del cliente (el precio va solo al WhatsApp de ADG)
     argAutosAPI: 'https://argautos.com/api/v1'
@@ -53,7 +57,59 @@ function trackEvent(nombre, params) {
             gtag('event', nombre, params || {});
         }
     } catch (e) { /* silencioso */ }
+    trackPixel(nombre, params || {});
 }
+
+/* ============================================
+   PÍXEL DE META (Facebook / Instagram)
+   ============================================
+   Se carga solo si CONFIG.metaPixelId tiene un ID. Traduce los eventos de la web
+   a eventos estándar de Meta para poder medir anuncios y armar públicos:
+     ver_auto → ViewContent · click_whatsapp → Contact · formularios y consultas → Lead */
+const PIXEL_EVENTOS = {
+    ver_auto: 'ViewContent',
+    click_whatsapp: 'Contact',
+    formulario_contacto: 'Lead',
+    formulario_tasacion: 'Lead',
+    consulta_simulacion: 'Lead',
+    consulta_0km_generica: 'Lead',
+    consulta_marca: 'Lead',
+    consulta_otras_marcas: 'Lead'
+};
+
+function cargarPixel() {
+    if (!CONFIG.metaPixelId || window.fbq) return;
+    /* eslint-disable */
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    /* eslint-enable */
+    fbq('init', CONFIG.metaPixelId);
+    fbq('track', 'PageView');
+}
+
+function trackPixel(nombre, params) {
+    try {
+        const evento = PIXEL_EVENTOS[nombre];
+        if (!evento || typeof fbq !== 'function') return;
+        const datos = {};
+        if (params.auto_id) {
+            datos.content_ids = [String(params.auto_id)];
+            datos.content_type = 'vehicle';
+            const a = (typeof autos !== 'undefined') ? autos.find(x => x.id === params.auto_id) : null;
+            if (a) {
+                datos.content_name = `${a.marca} ${a.modelo} ${a.version}`.trim();
+                if (a.precio && a.tipo !== '0km') { datos.value = a.precio; datos.currency = a.moneda === 'USD' ? 'USD' : 'ARS'; }
+            }
+        }
+        if (params.origen) datos.content_category = params.origen;
+        fbq('track', evento, datos);
+    } catch (e) { /* silencioso */ }
+}
+
+cargarPixel();
 
 /* ============================================
    DATOS DE DEMO (se usan hasta conectar Sheets)
@@ -123,6 +179,8 @@ let autosFiltrados = [];
 let filtroActual = 'todos';
 let currentCarouselIndex = 0;
 let currentModalCar = null;
+// id → { slug } de las páginas propias de cada auto (/autos/<slug>/), generadas por GitHub Actions
+let paginasAutos = {};
 let currentModalImageIndex = 0;
 
 /* ============================================
@@ -304,6 +362,24 @@ function parsearCSV(texto) {
 /* ============================================
    CARGA DE DATOS
    ============================================ */
+// Lee qué autos ya tienen página propia. Si falla (o el auto es nuevo y todavía
+// no se generó su página), los links usan el formato viejo /?auto=ID, que sigue funcionando.
+async function cargarPaginasAutos() {
+    try {
+        const res = await fetch('/autos/manifest.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const data = await res.json();
+        paginasAutos = (data && data.autos) || {};
+    } catch (e) { /* sin páginas: se usa /?auto=ID */ }
+}
+
+// Link para compartir un auto: su página propia si existe, si no /?auto=ID
+function urlAuto(auto) {
+    const p = paginasAutos[auto.id];
+    if (p && p.slug) return `${window.location.origin}/autos/${p.slug}/`;
+    return `${window.location.origin}/?auto=${encodeURIComponent(auto.id)}`;
+}
+
 async function cargarAutos() {
     if (!CONFIG.sheetURL) {
         console.log('No hay sheetURL configurada. Usando datos demo.');
@@ -383,7 +459,7 @@ function renderCard(auto) {
                      onerror="this.src='https://via.placeholder.com/800x600/f5f5f5/8a8a8a?text=Sin+foto'">
             </div>
             <div class="car-info">
-                <h3 class="car-title">${auto.marca} ${auto.modelo}</h3>
+                <h3 class="car-title"><a href="${urlAuto(auto)}" onclick="event.preventDefault()">${auto.marca} ${auto.modelo}</a></h3>
                 <p class="car-subtitle">${auto.version} / ${auto.transmision} / ${auto.combustible}</p>
                 <div class="car-specs">
                     <span class="car-spec"><i class="far fa-calendar"></i> ${auto.año}</span>
@@ -532,7 +608,7 @@ function renderCatalogo() {
     const counter = document.getElementById('catalogCounter');
 
     if (autosFiltrados.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>No encontramos autos con esos filtros.<br>Probá con otros criterios o consultanos por WhatsApp.</p></div>';
+        grid.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><p>No encontramos autos con esos filtros.<br>Probá con otros filtros o consultanos por WhatsApp.</p></div>';
         counter.textContent = '0 unidades';
         // Ocultar botón si no hay autos
         const btnVerMas = document.getElementById('btnVerMas');
@@ -716,27 +792,48 @@ function setImagenModal(idx) {
 }
 
 function linkConsultarWA(auto) {
-    const mensaje = `Hola! Me interesa consultar sobre el ${auto.marca} ${auto.modelo} ${auto.version} ${auto.año} que vi en la web.`;
+    const anio = auto.tipo === '0km' ? '0km' : auto.año;
+    const mensaje = `Hola! Me interesa el ${auto.marca} ${auto.modelo} ${auto.version} ${anio} que vi en la web: ${urlAuto(auto)}`;
     return `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`;
 }
 
 function compartirAuto(id) {
-    const url = `${window.location.origin}${window.location.pathname}?auto=${id}`;
     const auto = autos.find(a => a.id === id);
-    const texto = `Mirá este ${auto.marca} ${auto.modelo} en ADG Autos: ${url}`;
+    if (!auto) return;
+    const url = urlAuto(auto);
+    trackEvent('compartir_auto', { auto_id: id });
 
     if (navigator.share) {
         navigator.share({
             title: `${auto.marca} ${auto.modelo} - ADG Autos`,
-            text: texto,
+            text: `Mirá este ${auto.marca} ${auto.modelo} en ADG Autos`,
             url: url
         }).catch(() => {});
+    } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(url)
+            .then(() => mostrarAviso('Link copiado'))
+            .catch(() => window.prompt('Copiá el link:', url));
     } else {
-        // Fallback: copiar al portapapeles
-        navigator.clipboard.writeText(url).then(() => {
-            alert('Link copiado al portapapeles');
-        });
+        window.prompt('Copiá el link:', url);
     }
+}
+
+// Aviso chico abajo de la pantalla (reemplaza a alert, que bloquea la página)
+function mostrarAviso(texto) {
+    let el = document.getElementById('avisoFlotante');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'avisoFlotante';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#0a0a0a;color:#fff;' +
+            'padding:12px 20px;border-radius:8px;font-size:.9rem;font-weight:600;z-index:3000;max-width:90vw;text-align:center;' +
+            'box-shadow:0 8px 30px rgba(0,0,0,.25);transition:opacity .3s;opacity:0;pointer-events:none';
+        document.body.appendChild(el);
+    }
+    el.textContent = texto;
+    el.style.opacity = '1';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 3200);
 }
 
 function usarSimulador(precio, moneda) {
@@ -1436,7 +1533,8 @@ async function init() {
     await Promise.all([
         cargarConfigFinanciacion(),
         cargarAutos(),
-        cargarPromos()
+        cargarPromos(),
+        cargarPaginasAutos()
     ]);
     poblarSelectorMarcas();
     autosFiltrados = [...autos];
@@ -1480,7 +1578,25 @@ async function init() {
     const params = new URLSearchParams(window.location.search);
     const autoId = params.get('auto');
     if (autoId) {
-        setTimeout(() => abrirModal(autoId), 500);
+        if (autos.some(a => a.id === autoId)) {
+            setTimeout(() => abrirModal(autoId), 500);
+        } else {
+            // Link viejo a un auto que ya se vendió
+            const url = new URL(window.location);
+            url.searchParams.delete('auto');
+            window.history.replaceState({}, '', url);
+            mostrarAviso('Esa unidad ya no está disponible. Te mostramos el stock actual.');
+            setTimeout(scrollToCatalogo, 600);
+        }
+    }
+
+    // Viene desde la página de un auto con "Simular crédito": /?simular=PRECIO#simulador
+    const simular = parseInt(params.get('simular'), 10);
+    if (simular > 0) {
+        usarSimulador(simular, 'ARS');
+        const url = new URL(window.location);
+        url.searchParams.delete('simular');
+        window.history.replaceState({}, '', url);
     }
 }
 
