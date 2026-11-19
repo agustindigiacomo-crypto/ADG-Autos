@@ -284,7 +284,8 @@
     $('hPrecio').value = a.precio ? miles(a.precio) : ''; $('hKm').value = a.km ? miles(a.km) : '';
     $('hDest').checked = a.destacado;
     $('hVendido').hidden = !a.disponible; $('hRepublicar').hidden = a.disponible;
-    $('hVer').href = 'https:' + '//adgautos.com.ar/?auto=' + encodeURIComponent(a.id); // (sin barra doble en template: HtmlService la toma como comentario) $('hVer').hidden = !a.disponible;
+    $('hVer').href = 'https://adgautos.com.ar/?auto=' + encodeURIComponent(a.id);
+    $('hVer').hidden = !a.disponible;
     $('velo').classList.add('ver'); $('hoja').classList.add('ver');
   }
   function cerrarHoja() { $('velo').classList.remove('ver'); $('hoja').classList.remove('ver'); actual = null; }
