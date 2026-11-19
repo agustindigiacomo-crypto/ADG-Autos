@@ -915,6 +915,12 @@ section { padding: 90px 0; }
     box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
 }
 .form-group textarea { resize: vertical; min-height: 100px; font-family: inherit; }
+/* Tasación: listas de la guía CCA */
+.appraisal-form [hidden] { display: none !important; }
+.appraisal-form .tas-otro { margin-top: 8px; }
+.appraisal-form select:disabled { background: #f3f3f3; color: var(--color-light-gray); cursor: not-allowed; }
+.appraisal-form .tas-col-version { grid-column: span 2; }
+.tas-ayuda { display: block; margin-top: 6px; font-size: 0.74rem; color: var(--color-light-gray); }
 .form-submit {
     width: 100%; padding: 14px; background: var(--color-black);
     color: var(--color-white); border: none; border-radius: 6px;
@@ -1133,6 +1139,7 @@ section { padding: 90px 0; }
     .footer-grid { grid-template-columns: 1fr; gap: 28px; }
     .contact-form, .appraisal-form, .simulator-box { padding: 24px; }
     .appraisal-form .form-row { grid-template-columns: 1fr; gap: 12px; }
+    .appraisal-form .tas-col-version { grid-column: auto; }
     .testimonial-card { padding: 32px 22px; }
     .testimonial-text { font-size: 0.98rem; }
 

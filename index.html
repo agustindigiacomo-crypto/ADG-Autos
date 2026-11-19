@@ -44,7 +44,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Barlow+Condensed:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="styles.css?v=20261119">
+<link rel="stylesheet" href="styles.css?v=20261119d">
 </head>
 <body>
 
@@ -496,27 +496,34 @@
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Marca *</label>
-                    <input type="text" id="tas-marca" required placeholder="Ej: Chevrolet">
+                    <label for="tas-marca">Marca *</label>
+                    <select id="tas-marca" required disabled><option value="">Cargando marcas…</option></select>
+                    <input type="text" id="tas-marca-otro" class="tas-otro" placeholder="Escribí la marca" autocomplete="off" hidden>
                 </div>
                 <div class="form-group">
-                    <label>Modelo *</label>
-                    <input type="text" id="tas-modelo" required placeholder="Ej: Cruze">
+                    <label for="tas-modelo">Modelo *</label>
+                    <select id="tas-modelo" required disabled><option value="">Elegí primero la marca</option></select>
+                    <input type="text" id="tas-modelo-otro" class="tas-otro" placeholder="Escribí el modelo" autocomplete="off" hidden>
                 </div>
                 <div class="form-group">
-                    <label>Versión</label>
-                    <input type="text" id="tas-version" placeholder="Ej: LTZ">
+                    <label for="tas-anio">Año *</label>
+                    <select id="tas-anio" required disabled><option value="">Elegí primero el modelo</option></select>
+                    <input type="number" id="tas-anio-otro" class="tas-otro" placeholder="Ej: 2015" min="1980" max="2027" inputmode="numeric" hidden>
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label>Año *</label>
-                    <input type="number" id="tas-anio" required min="2000" max="2026">
+                <div class="form-group tas-col-version">
+                    <label for="tas-version">Versión</label>
+                    <select id="tas-version" disabled><option value="">Elegí primero el año</option></select>
+                    <input type="text" id="tas-version-otro" class="tas-otro" placeholder="Ej: LTZ 1.4 turbo automático" autocomplete="off" hidden>
+                    <small class="tas-ayuda" id="tas-version-ayuda">Las versiones salen de la guía oficial de la Cámara del Comercio Automotor.</small>
                 </div>
                 <div class="form-group">
-                    <label>Kilómetros *</label>
-                    <input type="number" id="tas-km" required placeholder="Ej: 85000">
+                    <label for="tas-km">Kilómetros *</label>
+                    <input type="text" id="tas-km" required placeholder="Ej: 85.000" inputmode="numeric" autocomplete="off">
                 </div>
+            </div>
+            <div class="form-row">
                 <div class="form-group">
                     <label>Combustible</label>
                     <select id="tas-combustible">
@@ -774,6 +781,6 @@
     </div>
 </footer>
 
-<script src="script.js?v=20261119c"></script>
+<script src="script.js?v=20261119d"></script>
 </body>
 </html>
