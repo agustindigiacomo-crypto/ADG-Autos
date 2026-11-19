@@ -35,11 +35,7 @@ const CONFIG = {
 
     // ID del Píxel de Meta (Administrador de eventos > Orígenes de datos > tu píxel).
     // Vacío = el píxel no se carga. Al completarlo, también lo toman las páginas de cada auto.
-    metaPixelId: '2603231776861941',
-
-    // API pública gratuita de precios de autos en Argentina (CCA + ACARA)
-    // Se usa para la tasación del cliente (el precio va solo al WhatsApp de ADG)
-    argAutosAPI: 'https://argautos.com/api/v1'
+    metaPixelId: '2603231776861941'
 };
 
 // Config runtime (se rellena desde Sheets o default)
@@ -1244,177 +1240,47 @@ function enviarContacto(e) {
 }
 
 /* ============================================
-   TASACIÓN - busca precio de referencia en ACARA/CCA
-   (el precio va SOLO al WhatsApp de ADG, el cliente no lo ve)
+   TASACIÓN
+   El cliente arma su mensaje y lo manda por WhatsApp.
+   No se agrega ningún precio de referencia: lo que se escribe acá lo ve el cliente
+   en su WhatsApp antes de enviarlo.
    ============================================ */
 
-// Normaliza strings para comparar (saca tildes, pasa a minúscula, quita espacios extra)
-function normalizar(s) {
-    return (s || '')
-        .toString()
-        .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-// Busca el mejor match en una lista de objetos {id, name} según un término
-function matchMejor(lista, termino) {
-    const t = normalizar(termino);
-    if (!t || !lista || !lista.length) return null;
-
-    // 1. Match exacto
-    let match = lista.find(x => normalizar(x.name) === t);
-    if (match) return match;
-
-    // 2. Match que empieza igual
-    match = lista.find(x => normalizar(x.name).startsWith(t));
-    if (match) return match;
-
-    // 3. Match que contiene
-    match = lista.find(x => normalizar(x.name).includes(t));
-    if (match) return match;
-
-    // 4. Al revés: término contiene el nombre
-    match = lista.find(x => t.includes(normalizar(x.name)) && normalizar(x.name).length > 2);
-    return match;
-}
-
-// Consulta el precio de referencia en argautos.com
-// Devuelve null si no encuentra o si la API falla
-async function buscarPrecioReferencia(marca, modelo, version, anio) {
-    try {
-        // 1. Buscar la marca
-        const brandsRes = await fetch(`${CONFIG.argAutosAPI}/brands`);
-        if (!brandsRes.ok) throw new Error('No se pudieron cargar las marcas');
-        const brandsJson = await brandsRes.json();
-        const brands = Array.isArray(brandsJson) ? brandsJson : (brandsJson.data || brandsJson.brands || []);
-
-        const brandMatch = matchMejor(brands, marca);
-        if (!brandMatch) return { error: 'Marca no encontrada', marca };
-
-        // 2. Buscar modelos de esa marca
-        const modelsRes = await fetch(`${CONFIG.argAutosAPI}/brands/${brandMatch.id}/models`);
-        if (!modelsRes.ok) throw new Error('No se pudieron cargar los modelos');
-        const modelsJson = await modelsRes.json();
-        const models = Array.isArray(modelsJson) ? modelsJson : (modelsJson.data || modelsJson.models || []);
-
-        const modelMatch = matchMejor(models, modelo);
-        if (!modelMatch) return { error: 'Modelo no encontrado', marca: brandMatch.name };
-
-        // 3. Buscar versiones del modelo
-        const versionsRes = await fetch(`${CONFIG.argAutosAPI}/models/${modelMatch.id}/versions`);
-        if (!versionsRes.ok) throw new Error('No se pudieron cargar las versiones');
-        const versionsJson = await versionsRes.json();
-        const versions = Array.isArray(versionsJson) ? versionsJson : (versionsJson.data || versionsJson.versions || []);
-
-        // Si el cliente no cargó versión o no matchea, tomar la primera disponible
-        let versionMatch = version ? matchMejor(versions, version) : null;
-        if (!versionMatch && versions.length > 0) versionMatch = versions[0];
-        if (!versionMatch) return { error: 'Sin versiones disponibles', marca: brandMatch.name, modelo: modelMatch.name };
-
-        // 4. Buscar valuación en ARS para el año
-        const valRes = await fetch(`${CONFIG.argAutosAPI}/versions/${versionMatch.id}/valuations?currency=ars`);
-        if (!valRes.ok) throw new Error('No se pudieron cargar las valuaciones');
-        const valJson = await valRes.json();
-        const valuations = Array.isArray(valJson) ? valJson : (valJson.data || valJson.valuations || []);
-
-        // Buscar valuación del año exacto, o el más cercano
-        let valuacion = valuations.find(v => parseInt(v.year) === parseInt(anio));
-        if (!valuacion && valuations.length > 0) {
-            // Si no hay exacta, buscar la más cercana
-            const valuaciones_ordenadas = valuations.slice().sort((a, b) =>
-                Math.abs(parseInt(a.year) - anio) - Math.abs(parseInt(b.year) - anio)
-            );
-            valuacion = valuaciones_ordenadas[0];
-        }
-
-        if (!valuacion) return { error: 'Sin valuación para ese año', marca: brandMatch.name, modelo: modelMatch.name, version: versionMatch.name };
-
-        return {
-            ok: true,
-            marca: brandMatch.name,
-            modelo: modelMatch.name,
-            version: versionMatch.name,
-            anio: valuacion.year,
-            precio: valuacion.price || valuacion.value || valuacion.amount,
-            currency: valuacion.currency || 'ARS',
-            anio_consultado: anio
-        };
-
-    } catch (err) {
-        console.warn('Error consultando argautos.com:', err);
-        return { error: err.message || 'Error de conexión' };
-    }
-}
-
-async function enviarTasacion(e) {
+function enviarTasacion(e) {
     e.preventDefault();
-
-    const btn = e.target.querySelector('button[type="submit"]');
-    const textoOriginal = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando tu tasación...';
+    const v = id => (document.getElementById(id).value || '').trim();
 
     const datos = {
-        nombre: document.getElementById('tas-nombre').value,
-        telefono: document.getElementById('tas-telefono').value,
-        marca: document.getElementById('tas-marca').value,
-        modelo: document.getElementById('tas-modelo').value,
-        version: document.getElementById('tas-version').value || '-',
-        anio: document.getElementById('tas-anio').value,
-        km: document.getElementById('tas-km').value,
-        combustible: document.getElementById('tas-combustible').value,
-        transmision: document.getElementById('tas-transmision').value,
-        estado: document.getElementById('tas-estado').value,
-        service: document.getElementById('tas-service').value,
-        papeles: document.getElementById('tas-papeles').value,
-        comentarios: document.getElementById('tas-comentarios').value || 'sin comentarios'
+        nombre: v('tas-nombre'),
+        telefono: v('tas-telefono'),
+        marca: v('tas-marca'),
+        modelo: v('tas-modelo'),
+        version: v('tas-version') || '-',
+        anio: v('tas-anio'),
+        km: v('tas-km'),
+        combustible: v('tas-combustible'),
+        transmision: v('tas-transmision'),
+        estado: v('tas-estado'),
+        service: v('tas-service'),
+        papeles: v('tas-papeles'),
+        comentarios: v('tas-comentarios') || 'sin comentarios'
     };
 
-    // Consultar precio de referencia (silencioso, no bloquea al cliente si falla)
-    let bloqueReferencia = '';
-    try {
-        const ref = await buscarPrecioReferencia(datos.marca, datos.modelo, datos.version, datos.anio);
-        if (ref && ref.ok && ref.precio) {
-            const precioFormateado = '$ ' + parseInt(ref.precio).toLocaleString('es-AR');
-            bloqueReferencia =
-                `%0A%0A*🔒 Referencia interna (solo ADG)*%0A` +
-                `• ${ref.marca} ${ref.modelo} ${ref.version}%0A` +
-                `• Año: ${ref.anio}${ref.anio_consultado != ref.anio ? ' (cliente pidió ' + ref.anio_consultado + ')' : ''}%0A` +
-                `• CCA/ACARA: ${precioFormateado}%0A` +
-                `• Fuente: argautos.com`;
-        } else if (ref && ref.error) {
-            bloqueReferencia =
-                `%0A%0A*🔒 Referencia interna (solo ADG)*%0A` +
-                `• No se encontró match automático%0A` +
-                `• Motivo: ${ref.error}%0A` +
-                `• Buscar manualmente en acara.org.ar`;
-        }
-    } catch (err) {
-        // Silencioso, no mostrar al cliente
-        console.warn('Error obteniendo referencia:', err);
-    }
-
     const texto =
-        `*Solicitud de tasación*%0A%0A` +
-        `*Contacto*%0A` +
-        `• Nombre: ${datos.nombre}%0A` +
-        `• Teléfono: ${datos.telefono}%0A%0A` +
-        `*Vehículo*%0A` +
-        `• ${datos.marca} ${datos.modelo} ${datos.version}%0A` +
-        `• Año: ${datos.anio}%0A` +
-        `• Km: ${datos.km}%0A` +
-        `• ${datos.combustible} / ${datos.transmision}%0A%0A` +
-        `*Estado*%0A` +
-        `• Estado general: ${datos.estado}%0A` +
-        `• Service al día: ${datos.service}%0A` +
-        `• Papeles al día: ${datos.papeles}%0A%0A` +
-        `*Comentarios*%0A${datos.comentarios}` +
-        bloqueReferencia;
-
-    btn.disabled = false;
-    btn.innerHTML = textoOriginal;
+        `*Solicitud de tasación*\n\n` +
+        `*Contacto*\n` +
+        `• Nombre: ${datos.nombre}\n` +
+        `• Teléfono: ${datos.telefono}\n\n` +
+        `*Vehículo*\n` +
+        `• ${datos.marca} ${datos.modelo} ${datos.version}\n` +
+        `• Año: ${datos.anio}\n` +
+        `• Km: ${datos.km}\n` +
+        `• ${datos.combustible} / ${datos.transmision}\n\n` +
+        `*Estado*\n` +
+        `• Estado general: ${datos.estado}\n` +
+        `• Service al día: ${datos.service}\n` +
+        `• Papeles al día: ${datos.papeles}\n\n` +
+        `*Comentarios*\n${datos.comentarios}`;
 
     trackEvent('formulario_tasacion', {
         marca: datos.marca,
@@ -1422,7 +1288,8 @@ async function enviarTasacion(e) {
         anio: datos.anio
     });
 
-    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${texto}`, '_blank');
+    // Se abre en el mismo clic (sin esperas) para que el navegador no lo bloquee como ventana emergente
+    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(texto)}`, '_blank');
 }
 
 /* ============================================
