@@ -1241,56 +1241,289 @@ function enviarContacto(e) {
 
 /* ============================================
    TASACIÓN
-   El cliente arma su mensaje y lo manda por WhatsApp.
-   No se agrega ningún precio de referencia: lo que se escribe acá lo ve el cliente
-   en su WhatsApp antes de enviarlo.
+   Marca → modelo → año → versión salen de la guía oficial de la CCA
+   (nuestrosautos.cca.org.ar, la misma que usa la Cámara en su web).
+   El valor de referencia va en el mensaje que arma el cliente, así que lo ve:
+   por eso se explica de dónde sale y que no es una oferta.
+   Si la guía no responde, cada campo pasa a texto libre y el mensaje sale sin valor.
    ============================================ */
+const CCA_API = 'https://nuestrosautos.cca.org.ar/api/classifieds';
+const TAS_OTRO = '__otro';
+const TAS_NOSE = '__nose';
+const tasCache = {};
+let tasVersiones = [];   // [{ version, precio }] del año elegido
+
+async function ccaGet(ruta) {
+    if (tasCache[ruta]) return tasCache[ruta];
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    try {
+        const res = await fetch(CCA_API + ruta, { signal: ctrl.signal });
+        if (!res.ok) throw new Error('CCA ' + res.status);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error('Respuesta inesperada');
+        tasCache[ruta] = data;
+        return data;
+    } finally {
+        clearTimeout(t);
+    }
+}
+
+function tasEl(campo) { return document.getElementById('tas-' + campo); }
+function tasOtro(campo) { return document.getElementById('tas-' + campo + '-otro'); }
+const TAS_OBLIGATORIOS = ['marca', 'modelo', 'anio'];
+
+// modo: 'lista' (solo select) · 'otro' (select en "otra…" + texto) · 'libre' (solo texto) · 'espera' (select deshabilitado)
+function tasModo(campo, modo, textoEspera) {
+    const sel = tasEl(campo), txt = tasOtro(campo);
+    const obligatorio = TAS_OBLIGATORIOS.includes(campo);
+    sel.hidden = modo === 'libre';
+    sel.disabled = modo === 'espera';
+    sel.required = obligatorio && modo !== 'libre';
+    txt.hidden = !(modo === 'otro' || modo === 'libre');
+    txt.required = obligatorio && !txt.hidden;
+    if (modo === 'espera') sel.innerHTML = `<option value="">${textoEspera || ''}</option>`;
+    if (txt.hidden) txt.value = '';
+}
+
+function tasLlenar(campo, items, placeholder, textoOtro) {
+    const sel = tasEl(campo);
+    sel.innerHTML = `<option value="">${placeholder}</option>` +
+        items.map(i => `<option value="${String(i.valor).replace(/"/g, '&quot;')}">${i.texto}</option>`).join('') +
+        (textoOtro ? `<option value="${campo === 'version' ? TAS_NOSE : TAS_OTRO}">${textoOtro}</option>` : '');
+    tasModo(campo, 'lista');
+}
+
+// Desde un campo hacia abajo, todo pasa a texto libre (ej: marca que no está en la guía)
+function tasLibreDesde(campos) {
+    campos.forEach(c => tasModo(c, 'libre'));
+    tasVersiones = [];
+    tasActualizarAyuda();
+}
+
+function tasActualizarAyuda(texto) {
+    const ayuda = document.getElementById('tas-version-ayuda');
+    if (ayuda) ayuda.textContent = texto || 'Las versiones salen de la guía oficial de la Cámara del Comercio Automotor.';
+}
+
+async function initTasacion() {
+    if (!tasEl('marca')) return;
+    try {
+        const marcas = await ccaGet('/listamarcas');
+        tasLlenar('marca', marcas.map(m => ({ valor: m.name, texto: m.name })), 'Elegí la marca', 'Otra marca…');
+    } catch (e) {
+        console.warn('Guía CCA no disponible, tasación en modo manual:', e);
+        tasLibreDesde(['marca', 'modelo', 'anio', 'version']);
+        tasActualizarAyuda(' ');
+    }
+
+    tasEl('marca').addEventListener('change', async () => {
+        const marca = tasEl('marca').value;
+        tasModo('anio', 'espera', 'Elegí primero el modelo');
+        tasModo('version', 'espera', 'Elegí primero el año');
+        tasVersiones = [];
+        if (marca === TAS_OTRO) { tasModo('marca', 'otro'); tasLibreDesde(['modelo', 'anio', 'version']); tasOtro('marca').focus(); return; }
+        tasModo('marca', 'lista');
+        if (!marca) { tasModo('modelo', 'espera', 'Elegí primero la marca'); return; }
+        tasModo('modelo', 'espera', 'Cargando modelos…');
+        try {
+            const modelos = await ccaGet('/listamodelos/' + encodeURIComponent(marca));
+            if (tasEl('marca').value !== marca) return; // cambió mientras cargaba
+            const items = modelos
+                .map(m => ({ valor: m.id, texto: m.name }))
+                .sort((x, y) => x.texto.localeCompare(y.texto, 'es'));
+            tasLlenar('modelo', items, 'Elegí el modelo', 'Otro modelo…');
+        } catch (e) {
+            tasLibreDesde(['modelo', 'anio', 'version']);
+        }
+    });
+
+    tasEl('modelo').addEventListener('change', async () => {
+        const modelo = tasEl('modelo').value;
+        tasModo('version', 'espera', 'Elegí primero el año');
+        tasVersiones = [];
+        if (modelo === TAS_OTRO) { tasModo('modelo', 'otro'); tasLibreDesde(['anio', 'version']); tasOtro('modelo').focus(); return; }
+        tasModo('modelo', 'lista');
+        if (!modelo) { tasModo('anio', 'espera', 'Elegí primero el modelo'); return; }
+        tasModo('anio', 'espera', 'Cargando años…');
+        try {
+            const anios = await ccaGet(`/listaversionanio/${encodeURIComponent(modelo)}/null`);
+            if (tasEl('modelo').value !== modelo) return;
+            const items = anios
+                .map(a => parseInt(a.name, 10)).filter(n => n > 1900)
+                .sort((x, y) => y - x)
+                .map(n => ({ valor: n, texto: n }));
+            tasLlenar('anio', items, 'Elegí el año', 'Otro año…');
+        } catch (e) {
+            tasLibreDesde(['anio', 'version']);
+        }
+    });
+
+    tasEl('anio').addEventListener('change', async () => {
+        const modelo = tasEl('modelo').value, anio = tasEl('anio').value;
+        tasVersiones = [];
+        if (anio === TAS_OTRO) {
+            tasModo('anio', 'otro'); tasLibreDesde(['version']); tasOtro('anio').focus();
+            tasActualizarAyuda('Ese año no figura en la guía: escribí la versión como la conozcas.');
+            return;
+        }
+        tasModo('anio', 'lista');
+        if (!anio) { tasModo('version', 'espera', 'Elegí primero el año'); return; }
+        tasModo('version', 'espera', 'Cargando versiones…');
+        try {
+            const versiones = await ccaGet(`/listaversionanio/${encodeURIComponent(modelo)}/${encodeURIComponent(anio)}`);
+            if (tasEl('anio').value !== anio) return;
+            tasVersiones = versiones
+                .map(v => ({ version: tasLimpiarVersion(v.version), precio: tasPrecioNumero(v.precio) }))
+                .filter(v => v.version);
+            const items = tasVersiones.map((v, i) => ({ valor: i, texto: v.version }));
+            tasLlenar('version', items, 'Elegí la versión', 'No sé cuál es / no figura');
+            tasActualizarAyuda();
+        } catch (e) {
+            tasLibreDesde(['version']);
+        }
+    });
+
+    tasEl('version').addEventListener('change', () => {
+        const v = tasEl('version').value;
+        if (v === TAS_NOSE) { tasModo('version', 'otro'); tasOtro('version').placeholder = 'Si sabés algo, escribilo (opcional)'; return; }
+        tasModo('version', 'lista');
+        const elegida = tasVersiones[parseInt(v, 10)];
+        if (elegida) tasInferirMecanica(elegida.version);
+    });
+
+    // Km con separador de miles mientras se escribe
+    const km = tasEl('km');
+    km.addEventListener('input', () => {
+        const n = km.value.replace(/\D/g, '').slice(0, 7);
+        km.value = n ? parseInt(n, 10).toLocaleString('es-AR') : '';
+    });
+}
+
+// "5p 1,4 T Ltz A/t" → "5P 1.4 T LTZ A/T" (como se escribe en el rubro)
+function tasLimpiarVersion(v) {
+    return (v || '').replace(/\\\//g, '/').replace(/\s+/g, ' ').trim()
+        .replace(/(\d),(\d)/g, '$1.$2')
+        .toUpperCase();
+}
+
+function tasPrecioNumero(p) {
+    const n = parseInt(String(p || '').replace(/\D/g, ''), 10);
+    return n > 0 ? n : 0;
+}
+
+// Completa transmisión y combustible según lo que dice la versión (el cliente puede cambiarlo)
+function tasInferirMecanica(version) {
+    const v = ' ' + version.toLowerCase() + ' ';
+    const trans = tasEl('transmision'), comb = tasEl('combustible');
+    if (/\bcvt\b/.test(v)) trans.value = 'CVT';
+    else if (/\b(a\/t|at|aut|automatica|automático|automatico|tiptronic|dsg|steptronic)\b|\bat\d/.test(v)) trans.value = 'Automática';
+    else if (/\b(m\/t|mt|\d?mt|manual)\b|\d mt\b|\dmt\b/.test(v)) trans.value = 'Manual';
+    if (/\b(diesel|tdi|hdi|tdci|crdi|dci|jtd|multijet|turbodiesel|td)\b/.test(v)) comb.value = 'Diésel';
+    else if (/\b(hibrido|híbrido|hybrid|hev|phev)\b/.test(v)) comb.value = 'Híbrido';
+    else if (/\bgnc\b/.test(v)) comb.value = 'GNC';
+}
+
+function tasValor(campo) {
+    const sel = tasEl(campo), txt = tasOtro(campo);
+    if (!sel.hidden && sel.value && sel.value !== TAS_OTRO && sel.value !== TAS_NOSE) {
+        return sel.options[sel.selectedIndex].text.trim();
+    }
+    return (txt.value || '').trim();
+}
+
+function tasMesGuia() {
+    const mes = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).replace(' de ', ' ');
+    return mes.charAt(0).toUpperCase() + mes.slice(1);
+}
+
+function tasPesos(n) {
+    return '$ ' + n.toLocaleString('es-AR');
+}
+
+function capitalizar(s) {
+    s = (s || '').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 
 function enviarTasacion(e) {
     e.preventDefault();
     const v = id => (document.getElementById(id).value || '').trim();
+    const selVersion = tasEl('version');
+    const versionElegida = (!selVersion.hidden && selVersion.value !== '' && selVersion.value !== TAS_NOSE)
+        ? tasVersiones[parseInt(selVersion.value, 10)] : null;
+    const noSabeVersion = !selVersion.hidden && selVersion.value === TAS_NOSE;
 
     const datos = {
         nombre: v('tas-nombre'),
         telefono: v('tas-telefono'),
-        marca: v('tas-marca'),
-        modelo: v('tas-modelo'),
-        version: v('tas-version') || '-',
-        anio: v('tas-anio'),
+        marca: tasValor('marca'),
+        modelo: tasValor('modelo'),
+        anio: tasValor('anio'),
+        version: tasValor('version'),
         km: v('tas-km'),
         combustible: v('tas-combustible'),
         transmision: v('tas-transmision'),
         estado: v('tas-estado'),
-        service: v('tas-service'),
-        papeles: v('tas-papeles'),
-        comentarios: v('tas-comentarios') || 'sin comentarios'
+        service: v('tas-service') === 'si' ? 'Sí' : 'No',
+        papeles: v('tas-papeles') === 'si' ? 'Sí' : 'No',
+        comentarios: v('tas-comentarios')
     };
 
-    const texto =
-        `*Solicitud de tasación*\n\n` +
-        `*Contacto*\n` +
-        `• Nombre: ${datos.nombre}\n` +
-        `• Teléfono: ${datos.telefono}\n\n` +
-        `*Vehículo*\n` +
-        `• ${datos.marca} ${datos.modelo} ${datos.version}\n` +
-        `• Año: ${datos.anio}\n` +
-        `• Km: ${datos.km}\n` +
-        `• ${datos.combustible} / ${datos.transmision}\n\n` +
-        `*Estado*\n` +
-        `• Estado general: ${datos.estado}\n` +
-        `• Service al día: ${datos.service}\n` +
-        `• Papeles al día: ${datos.papeles}\n\n` +
-        `*Comentarios*\n${datos.comentarios}`;
+    const L = [];
+    L.push('Hola! Quiero tasar mi auto:');
+    L.push('');
+    L.push(`*${datos.marca} ${datos.modelo} ${datos.anio}*`.replace(/\s+/g, ' '));
+    if (datos.version) L.push(datos.version);
+    else if (noSabeVersion) L.push('_Versión a confirmar_');
+    L.push(`${datos.km} km · ${datos.combustible} · ${datos.transmision}`);
+    L.push('');
+    L.push('*Estado*');
+    L.push(`- General: ${capitalizar(datos.estado)}`);
+    L.push(`- Service al día: ${datos.service}`);
+    L.push(`- Papeles al día: ${datos.papeles}`);
+    if (datos.comentarios) {
+        L.push('');
+        L.push('*Comentarios*');
+        L.push(datos.comentarios);
+    }
+    L.push('');
+    L.push('*Contacto*');
+    L.push(`${datos.nombre} · ${datos.telefono}`);
+
+    // Valor de referencia de la guía CCA
+    let referencia = 'ninguna';
+    const precios = tasVersiones.map(x => x.precio).filter(Boolean);
+    if (versionElegida && versionElegida.precio) {
+        referencia = 'version';
+        L.push('');
+        L.push('───────────────');
+        L.push(`*Valor de referencia CCA · ${tasMesGuia()}*`);
+        L.push(`*${tasPesos(versionElegida.precio)}*`);
+    } else if (noSabeVersion && precios.length) {
+        referencia = 'rango';
+        const min = Math.min(...precios), max = Math.max(...precios);
+        L.push('');
+        L.push('───────────────');
+        L.push(`*Valor de referencia CCA · ${tasMesGuia()}*`);
+        L.push(min === max ? `*${tasPesos(min)}*` : `Entre *${tasPesos(min)}* y *${tasPesos(max)}* según versión`);
+    }
+    if (referencia !== 'ninguna') {
+        L.push('_Valor de lista de la guía oficial de la Cámara del Comercio Automotor. La tasación final depende del peritaje, el estado y los km._');
+    }
 
     trackEvent('formulario_tasacion', {
         marca: datos.marca,
         modelo: datos.modelo,
-        anio: datos.anio
+        anio: datos.anio,
+        referencia_cca: referencia
     });
 
     // Se abre en el mismo clic (sin esperas) para que el navegador no lo bloquee como ventana emergente
-    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(texto)}`, '_blank');
+    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(L.join('\n'))}`, '_blank');
 }
+
+initTasacion();
 
 /* ============================================
    NAVBAR + MOBILE MENU
