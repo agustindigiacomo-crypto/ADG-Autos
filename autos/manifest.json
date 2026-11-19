@@ -154,19 +154,19 @@
    "titulo": "Citroen C3 SX 1.4 Pack Seguridad 2012"
   },
   "35": {
-   "hash": "e4227f3cbaef",
+   "hash": "a8462d01b726",
    "lastmod": "2026-11-19",
    "og_src": "https://lh3.googleusercontent.com/d/1IU1eEdORutr2V_9OAHINHdv2ztoY4uv3=w1600",
-   "precio": 0,
+   "precio": 18500,
    "slug": "mercedes-benz-c200-2013-35",
    "tipo": "usado",
    "titulo": "Mercedes Benz C200 Edition C 2013"
   },
   "36": {
-   "hash": "5ba359b5fce4",
+   "hash": "efb06581df89",
    "lastmod": "2026-11-19",
    "og_src": "https://lh3.googleusercontent.com/d/1RBe-CuErxWqabvz6PPOdAPG9bCsJZ6xy=w1600",
-   "precio": 23900000,
+   "precio": 23500000,
    "slug": "chevrolet-cruze-2022-36",
    "tipo": "usado",
    "titulo": "Chevrolet Cruze LT 1.4T 2022"
@@ -181,13 +181,22 @@
    "titulo": "Renault Sandero Stepway Intens 1.6 SCe 2024"
   },
   "38": {
-   "hash": "3c177f4562e9",
+   "hash": "3e836dbccb3a",
    "lastmod": "2026-11-19",
    "og_src": "https://lh3.googleusercontent.com/d/1GbkxErBJmJ69gFZBTsPyYl55RCvuQ4DL=w1600",
-   "precio": 14900000,
+   "precio": 14000000,
    "slug": "fiat-palio-2017-38",
    "tipo": "usado",
    "titulo": "Fiat Palio Attractive 1.4 Pack Top 2017"
+  },
+  "39": {
+   "hash": "fc4e9c61a7fc",
+   "lastmod": "2026-11-19",
+   "og_src": "https://lh3.googleusercontent.com/d/11PGuwD96FRPJzdOr7_n2bCFt3nFhlyVJ=w1600",
+   "precio": 32000000,
+   "slug": "renault-koleos-2018-39",
+   "tipo": "usado",
+   "titulo": "Renault Koleos Intens 2.5 4WD 2018"
   },
   "6": {
    "hash": "75ac205f66df",
@@ -208,7 +217,7 @@
    "titulo": "Jeep Compass BlackHawk 2.0 4x4 0km"
   }
  },
- "firma_stock": "4b1a8106d782",
+ "firma_stock": "f6db7f2b57dd",
  "firma_stock_fecha": "2026-11-19",
  "redirecciones": {},
  "vendidos": {},
