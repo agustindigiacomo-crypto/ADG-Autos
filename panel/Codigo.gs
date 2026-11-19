@@ -123,11 +123,18 @@ function actualizarAuto(id, cambios) {
 
 /* ---------------- Alta de un auto ---------------- */
 
+// La carpeta raíz se busca una sola vez y se recuerda (buscar por nombre en Drive es lento)
 function carpetaRaiz_() {
+  const props = PropertiesService.getScriptProperties();
+  const guardada = props.getProperty('CARPETA_FOTOS_ID');
+  if (guardada) {
+    try { const f = DriveApp.getFolderById(guardada); if (!f.isTrashed()) return f; } catch (e) { }
+  }
   const it = DriveApp.getFoldersByName(PANEL.CARPETA_FOTOS);
-  if (it.hasNext()) return it.next();
+  if (it.hasNext()) { const f = it.next(); props.setProperty('CARPETA_FOTOS_ID', f.getId()); return f; }
   const f = DriveApp.createFolder(PANEL.CARPETA_FOTOS);
   f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  props.setProperty('CARPETA_FOTOS_ID', f.getId());
   return f;
 }
 
