@@ -198,6 +198,15 @@
    "tipo": "usado",
    "titulo": "Renault Koleos Intens 2.5 4WD 2018"
   },
+  "40": {
+   "hash": "004138d875cd",
+   "lastmod": "2026-11-25",
+   "og_src": "https://lh3.googleusercontent.com/d/110JtwPTB_xRUMNXC3S1DTRx0BBzgMXQl=w1600",
+   "precio": 0,
+   "slug": "baic-bj30-2026-40",
+   "tipo": "0km",
+   "titulo": "BAIC BJ30 Hybrid 1.5 4x2 0km"
+  },
   "6": {
    "hash": "75ac205f66df",
    "lastmod": "2026-11-19",
@@ -217,8 +226,8 @@
    "titulo": "Jeep Compass BlackHawk 2.0 4x4 0km"
   }
  },
- "firma_stock": "f6db7f2b57dd",
- "firma_stock_fecha": "2026-11-19",
+ "firma_stock": "9911f98b9f34",
+ "firma_stock_fecha": "2026-11-25",
  "redirecciones": {},
  "vendidos": {},
  "version": 1
